@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RupiahReceipts AI</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>RpReceipts AI</h1>
+            <button onclick="window.print()" style="padding: 8px 16px; border:none; background:var(--text); color:white; border-radius:6px; cursor:pointer;">Export Report</button>
+        </header>
+
+        <label class="upload-zone" id="drop-zone">
+            <span id="upload-text">Tap or Drag Receipt Image Here</span>
+            <div class="loader" id="loader"></div>
+            <input type="file" id="file-input" accept="image/*">
+        </label>
+
+        <div class="stats-grid">
+            <div class="card">
+                <h3>Total Expenses (This Month)</h3>
+                <div class="value" id="monthly-total">Rp 0</div>
+            </div>
+            <div class="card">
+                <h3>Highest Item Price</h3>
+                <div class="value" id="max-item">Rp 0</div>
+                <div style="font-size: 0.8rem; color: #666;" id="max-item-name">-</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Recent Scans</h3>
+            <table id="receipt-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>File</th>
+                        <th class="amount">Total (IDR)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('file-input');
+        const uploadText = document.getElementById('upload-text');
+        const loader = document.getElementById('loader');
+
+        // Formatter
+        const fmtIDR = (num) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(num);
+
+        // Upload Handler
+        fileInput.addEventListener('change', async (e) => {
+            if (e.target.files.length === 0) return;
+            
+            const file = e.target.files[0];
+            const formData = new FormData();
+            formData.append('file', file);
+
+            uploadText.style.display = 'none';
+            loader.style.display = 'block';
+
+            try {
+                const res = await fetch('/upload', { method: 'POST', body: formData });
+                const data = await res.json();
+                alert(`Processed! Found ${data.items.length} items. Total: ${fmtIDR(data.total)}`);
+                loadAnalytics();
+            } catch (err) {
+                alert('Error processing receipt');
+                console.error(err);
+            } finally {
+                loader.style.display = 'none';
+                uploadText.style.display = 'block';
+                fileInput.value = '';
+            }
+        });
+
+        // Load Analytics
+        async function loadAnalytics() {
+            const res = await fetch('/api/analytics');
+            const data = await res.json();
+
+            // Update Cards
+            if(data.monthly.length > 0) {
+                document.getElementById('monthly-total').innerText = fmtIDR(data.monthly[0].total);
+            }
+            if(data.highest) {
+                document.getElementById('max-item').innerText = fmtIDR(data.highest.price);
+                document.getElementById('max-item-name').innerText = data.highest.item_name;
+            }
+
+            // Update Table
+            const tbody = document.querySelector('#receipt-table tbody');
+            tbody.innerHTML = '';
+            data.recent.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${row.upload_date.split(' ')[0]}</td>
+                    <td>${row.filename}</td>
+                    <td class="amount">${fmtIDR(row.total_amount)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Init
+        loadAnalytics();
+    </script>
+</body>
+</html>

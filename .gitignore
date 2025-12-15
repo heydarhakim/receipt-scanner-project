@@ -1,3 +1,6 @@
 .venv
 .env
 venv
+uploads
+db.sqlite
+__pycache__
