@@ -1,7 +1,7 @@
 import os
 import uuid
 import pandas as pd
-from flask import Blueprint, request, jsonify, send_file, current_app
+from flask import Blueprint, request, jsonify, send_file, current_app, render_template
 from werkzeug.utils import secure_filename
 from .models import db, Receipt, Item
 from .services.ocr_engine import process_image
@@ -16,7 +16,8 @@ def allowed_file(filename):
 
 @bp.route('/')
 def index():
-    return current_app.send_static_file('../templates/index.html')
+    # FIX: Use render_template instead of send_static_file
+    return render_template('index.html')
 
 @bp.route('/api/upload', methods=['POST'])
 def upload_receipt():
@@ -25,23 +26,23 @@ def upload_receipt():
     
     file = request.files['file']
     if file.filename == '' or not allowed_file(file.filename):
-        return jsonify({"error": "Invalid file"}), 400
+        return jsonify({"error": "Invalid file format. Use JPG or PNG."}), 400
 
-    # Save File
+    # Securely save the file
     filename = secure_filename(f"{uuid.uuid4().hex}_{file.filename}")
     save_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
     file.save(save_path)
 
-    # 1. Run OCR
+    # 1. OCR Processing
     raw_text_lines = process_image(save_path)
     
-    # 2. Parse Data
+    # 2. Text Parsing
     items_data, total_amt = parse_receipt_text(raw_text_lines)
 
-    # 3. Save to DB
+    # 3. Database Storage
     new_receipt = Receipt(filename=filename, total_amount=total_amt)
     db.session.add(new_receipt)
-    db.session.flush() # Get ID
+    db.session.flush() # Flush to generate the Receipt ID
 
     for item in items_data:
         db_item = Item(
@@ -59,16 +60,15 @@ def upload_receipt():
 
 @bp.route('/api/dashboard', methods=['GET'])
 def get_dashboard_data():
-    # Monthly Total
     current_month = datetime.now().strftime('%Y-%m')
+    
+    # Analytics Queries
     monthly_total = db.session.query(func.sum(Receipt.total_amount))\
         .filter(func.strftime('%Y-%m', Receipt.upload_date) == current_month).scalar() or 0
 
-    # Highest Price Item (All time)
     highest_item = Item.query.order_by(desc(Item.unit_price)).first()
     highest_item_dict = highest_item.to_dict() if highest_item else None
 
-    # Recent Receipts
     recents = Receipt.query.order_by(desc(Receipt.upload_date)).limit(5).all()
 
     return jsonify({
@@ -79,7 +79,6 @@ def get_dashboard_data():
 
 @bp.route('/api/export', methods=['GET'])
 def export_csv():
-    # Export all items to CSV
     query = db.session.query(
         Receipt.upload_date, 
         Receipt.filename, 
