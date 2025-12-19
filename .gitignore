@@ -1,6 +1,9 @@
 .venv
 .env
 venv
-uploads
-db.sqlite
+uploads/
+static/uploads/
+instance/
+*.db
+*.sqlite
 __pycache__
