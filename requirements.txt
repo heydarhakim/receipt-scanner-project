@@ -6,3 +6,7 @@ opencv-python-headless
 numpy
 python-dotenv
 aiofiles
+Flask
+guicorn
+pandas
+psycopg2-binary
