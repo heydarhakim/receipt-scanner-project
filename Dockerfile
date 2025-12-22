@@ -28,4 +28,5 @@ RUN mkdir -p instance static/uploads
 ENV FLASK_APP=run.py
 
 # 9. The command to run the app
-CMD sh -c "gunicorn run:app --bind 0.0.0.0:$PORT"
+# Use 1 worker to save RAM, 8 threads for concurrency, and 120s timeout for slow OCR
+CMD sh -c "gunicorn run:app --bind 0.0.0.0:$PORT --workers 1 --threads 8 --timeout 120"
